@@ -15,19 +15,33 @@
   const WeatherChart={props:['values','day','unit'],emits:['select'],setup(props){const min=computed(()=>Math.min(...props.values)-1);const max=computed(()=>Math.max(...props.values)+1);const points=computed(()=>props.values.map((v,i)=>[29+i*61,88-(v-min.value)/(max.value-min.value)*70]));const path=computed(()=>smoothPath(points.value));return{points,path,min,max};},template:`<svg class="weather-chart" viewBox="0 0 410 118" preserveAspectRatio="none" role="img" :aria-label="'七日趋势：'+values.join('、')+unit"><defs><linearGradient id="weatherFill" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#60dbe1" stop-opacity=".2"/><stop offset="1" stop-color="#60dbe1" stop-opacity="0"/></linearGradient></defs><line class="chart-grid" x1="29" x2="395" y1="18" y2="18"/><line class="chart-grid" x1="29" x2="395" y1="53" y2="53"/><line class="chart-grid" x1="29" x2="395" y1="88" y2="88"/><text x="0" y="21" class="chart-axis-label">{{max.toFixed(0)}}</text><text x="0" y="56" class="chart-axis-label">{{((min+max)/2).toFixed(0)}}</text><text x="0" y="91" class="chart-axis-label">{{min.toFixed(0)}}</text><path :d="path+' L 395 90 L 29 90 Z'" fill="url(#weatherFill)"/><line class="chart-selected" :x1="points[day][0]" :x2="points[day][0]" y1="10" y2="90"/><path :d="path" class="chart-line"/><g v-for="(p,i) in points"><circle :cx="p[0]" :cy="p[1]" :r="day===i?4:2" class="chart-point"/><text :x="p[0]" y="110" text-anchor="middle" class="chart-axis-label">01/{{16+i}}</text><rect class="chart-hit" :x="p[0]-23" y="0" width="46" height="118" @click="$emit('select',i)"><title>1月{{16+i}}日：{{values[i]}}{{unit}}</title></rect></g></svg>`};
   const storage={get(key,fallback){try{const s=localStorage.getItem('liaodong-ice:'+key);return s?JSON.parse(s):fallback;}catch{return fallback;}},set(key,value){try{localStorage.setItem('liaodong-ice:'+key,JSON.stringify(value));return true;}catch{return false;}}};
   createApp({components:{Icon,PanelTitle,MiniChart,WeatherChart},setup(){
-    const ports=reactive([
-      {id:'yingkou',name:'营口港',area:'鲅鱼圈航道',x:83,y:32,lon:'122.108',lat:'40.285',values:[78,82,85,79,65,54,48],route:'M 125 625 C 250 525 430 490 535 410 S 710 342 830 218'},
-      {id:'jinzhou',name:'锦州港',area:'进港航道',x:26,y:43,lon:'121.050',lat:'40.800',values:[52,58,61,54,42,34,27],route:'M 125 625 C 170 553 245 494 260 420 S 260 320 260 292'},
-      {id:'panjin',name:'盘锦港',area:'辽滨锚地',x:61,y:17,lon:'121.842',lat:'40.675',values:[67,72,80,86,83,74,62],route:'M 125 625 C 290 530 450 406 535 320 S 595 180 610 116'}
-    ]);
+    const scenarioDatasets={
+      port:[
+        {id:'yingkou',name:'营口港',area:'鲅鱼圈航道',x:83,y:32,lon:'122.108',lat:'40.285',values:[78,82,85,79,65,54,48],route:'M 125 625 C 250 525 430 490 535 410 S 710 342 830 218'},
+        {id:'jinzhou',name:'锦州港',area:'进港航道',x:26,y:43,lon:'121.050',lat:'40.800',values:[52,58,61,54,42,34,27],route:'M 125 625 C 170 553 245 494 260 420 S 260 320 260 292'},
+        {id:'panjin',name:'盘锦港',area:'辽滨锚地',x:61,y:17,lon:'121.842',lat:'40.675',values:[67,72,80,86,83,74,62],route:'M 125 625 C 290 530 450 406 535 320 S 595 180 610 116'}
+      ],
+      engineering:[
+        {id:'op1',name:'石油平台A',area:'北部作业区',x:70,y:22,lon:'121.500',lat:'40.700',values:[62,68,74,71,63,55,48],route:'M 125 625 C 250 500 400 420 520 350 S 650 250 700 150'},
+        {id:'op2',name:'石油平台B',area:'中部作业区',x:42,y:48,lon:'121.300',lat:'40.500',values:[45,52,58,55,48,40,33],route:'M 125 625 C 200 560 300 480 380 420 S 400 380 420 330'},
+        {id:'op3',name:'石油平台C',area:'南部作业区',x:82,y:62,lon:'121.800',lat:'40.300',values:[71,76,82,80,72,64,57],route:'M 125 625 C 280 580 450 520 600 480 S 750 400 820 300'}
+      ],
+      farming:[
+        {id:'farm1',name:'筏架区甲',area:'近岸贝藻区',x:32,y:72,lon:'121.100',lat:'40.200',values:[38,44,51,48,42,36,30],route:'M 125 625 C 180 580 250 540 320 500 S 330 480 320 440'},
+        {id:'farm2',name:'筏架区乙',area:'河口养殖区',x:55,y:82,lon:'121.600',lat:'40.100',values:[45,52,60,57,50,43,37],route:'M 125 625 C 220 590 350 550 480 520 S 530 500 550 460'},
+        {id:'farm3',name:'网箱区丙',area:'远海网箱区',x:78,y:76,lon:'122.000',lat:'40.150',values:[55,62,68,65,58,51,44],route:'M 125 625 C 300 580 500 540 650 510 S 730 490 780 450'}
+      ]
+    };
+    const ports=reactive([...scenarioDatasets.port]);
     const day=ref(0),selectedPort=ref(0),selectedGrid=ref(null),hoverGrid=ref(null),playing=ref(false),speed=ref(1),layer=ref('probability'),filter=ref(null),scenario=ref('port'),weatherTab=ref('temperature');
+    watch(scenario,(s)=>{ports.splice(0,ports.length,...scenarioDatasets[s]);selectedPort.value=0;selectedGrid.value=null;});
     const layers=reactive({wind:true,route:true,grid:false});
     const rules=ref([30,60,80]),coldAir=ref(true),draftRules=ref([30,60,80]),draftColdAir=ref(true);
     const savedRules=storage.get('rules',null);if(savedRules&&Array.isArray(savedRules.values)&&savedRules.values.length===3&&savedRules.values.every(Number.isFinite)&&savedRules.values[0]>0&&savedRules.values[0]<savedRules.values[1]&&savedRules.values[1]<savedRules.values[2]&&savedRules.values[2]<100){rules.value=savedRules.values;coldAir.value=savedRules.coldAir!==false;}
     const modal=ref(null),formError=ref(''),dialog=ref(null),emailInput=ref(null),subscribed=ref(false),subscription=reactive({email:'',ports:['yingkou'],levels:[1,2]});
     const savedSub=storage.get('subscription',null);if(savedSub&&typeof savedSub.email==='string'&&Array.isArray(savedSub.ports)&&Array.isArray(savedSub.levels)){Object.assign(subscription,savedSub);subscribed.value=true;}
     const toast=reactive({message:''}),clock=reactive({time:'',date:'',week:''});
-    const dates=Array.from({length:7},(_,i)=>new Date(Date.UTC(2023,0,16+i))),windValues=[5.2,6.8,8.4,7.1,5.8,4.3,3.7];
+    const dates=Array.from({length:7},(_,i)=>new Date(Date.UTC(2027,0,16+i))),windValues=[5.2,6.8,8.4,7.1,5.8,4.3,3.7];
     const scenarios=[{id:'port',name:'港航调度',icon:'anchor'},{id:'engineering',name:'海上作业',icon:'ship'},{id:'farming',name:'养殖防护',icon:'shield'}];
     const models=[{name:'LSTM',accuracy:95.2,f1:.94,rmse:.071},{name:'随机森林',accuracy:91.1,f1:.89,rmse:.103},{name:'线性回归',accuracy:87.6,f1:.84,rmse:.136},{name:'持续预报',accuracy:86.6,f1:.82,rmse:.152}];
     const modalTitles={subscribe:'订阅海冰风险预警',settings:'预警规则配置',about:'数据说明',warnings:'港口分级预警',backtest:'历史回测与模型对照'},backtestLead=ref(1);
@@ -40,7 +54,7 @@
     function portAdvice(prob){let r=risk(prob).index;return r===2?'强冷空气过程，警惕临时封航':r===1?'加强冰情监测，提前准备破冰':r===0?'注意浮冰，建议减速通航':'冰情较弱，可择机安排通航';}
     const decisionText=computed(()=>{let r=risk(detail.value.prob).index;if(scenario.value==='engineering')return r>=1?'流冰挤压风险上升，暂停高风险吊装，优先开展平台加固与近岸巡检。':'海冰影响相对较小，可安排短时巡检作业，持续关注风场与流冰变化。';if(scenario.value==='farming')return r>=1?'近岸堆积冰风险较高，请检查筏架与锚系，提前加固并转移易损设施。':'当前堆积冰风险较低，建议开展设施巡查，持续关注未来冷空气过程。';return r===2?'海冰覆盖较高并伴随强冷空气，存在临时封航风险，建议协调破冰船待命。':r===1?'海冰覆盖较高，建议安排破冰船辅助通航，控制船舶航速，关注后续冰情变化。':r===0?'存在局部浮冰，建议减速并加强瞭望，优先安排具备冰区航行能力的船舶。':'海冰影响较弱，可结合海事通告安排船舶进出港，保持日常冰情监测。';});
     const safeWindow=computed(()=>{if(scenario.value==='farming')return shortDate(day.value)+' · 提前加固';const values=selectedGrid.value?dates.map((_,i)=>IceField.value(selectedGrid.value.x,selectedGrid.value.y,i)):currentPort.value.values;const limit=scenario.value==='engineering'?rules.value[0]:rules.value[1];const available=values.map((v,i)=>v<=limit&&i>=day.value?i:-1).filter(i=>i>=0);if(!available.length)return '未来 7 天谨慎安排';let first=available[0],last=first;while(available.includes(last+1))last++;return first===last?shortDate(first):shortDate(first)+' — '+shortDate(last);});
-    function shortDate(i){return '01.'+(16+i);}function dateLabel(i){return '2023.01.'+(16+i);}
+    function shortDate(i){return '01.'+(16+i);}function dateLabel(i){return '2027.01.'+(16+i);}
     let timer,clockTimer,toastTimer,mapEngine,previousFocus;let mapSnapshot=null;
     function notify(message){clearTimeout(toastTimer);toast.message=message;toastTimer=setTimeout(()=>toast.message='',2600);}
     function stopPlay(){playing.value=false;clearInterval(timer);}
